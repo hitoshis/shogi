@@ -15,6 +15,7 @@
       --muted: #666;
       --gold: #111;
       --green: #111;
+      --font-jp: "Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
       --card-h: 30px;
       --gap: 3px;
     }
@@ -23,7 +24,7 @@
     html, body { margin: 0; min-height: 100%; background: var(--bg); }
     body {
       color: var(--text);
-      font-family: "Noto Sans JP", "Yu Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+      font-family: var(--font-jp);
       overflow-x: hidden;
     }
 
@@ -89,7 +90,31 @@
       margin-bottom: 10px;
     }
 
-    h1 { margin: 0; font-family: serif; font-size: 27px; letter-spacing: .13em; }
+    .header-tools { display: flex; align-items: center; gap: 14px; }
+    .highlight-button {
+      height: 34px;
+      padding: 0 13px;
+      border: 1px solid #999;
+      background: #fff;
+      color: #111;
+      font-family: var(--font-jp);
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .highlight-button:hover { background: #f5f5f5; }
+    .highlight-button[aria-pressed="true"] { background: #ffe45c; border-color: #b79a00; }
+    .row-toggles {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .row-toggle { display: flex; align-items: center; gap: 3px; cursor: pointer; }
+    .row-toggle input { width: 15px; height: 15px; margin: 0; accent-color: #555; }
+    body.highlight-top-eight .top-eight { background: #fff2a8 !important; }
+
+    h1 { margin: 0; font-family: var(--font-jp); font-size: 27px; letter-spacing: .13em; }
     h1 span { color: var(--gold); }
     .meta { color: var(--muted); font-size: 13px; white-space: nowrap; }
     .meta b { color: var(--text); font-size: 15px; }
@@ -239,8 +264,8 @@
       gap: 7px;
       white-space: nowrap;
       color: var(--text);
-      font-family: serif;
-      font-size: clamp(11px, .72vw, 14px);
+      font-family: var(--font-jp);
+      font-size: clamp(14px, .85vw, 17px);
       letter-spacing: .08em;
     }
     .name-cell .head-id {
@@ -261,16 +286,34 @@
       white-space: nowrap;
     }
     .result-cell {
+      position: relative;
       height: 76px;
       background: #fff;
-      font-family: "Yu Mincho", "Hiragino Mincho ProN", serif;
+      font-family: var(--font-jp);
       font-size: clamp(17px, 1.35vw, 25px);
       font-weight: 800;
     }
-    .result-cell.win { color: #111; background: #fff; }
-    .result-cell.loss { color: #666; }
+    .result-cell.win { color: #1a1a1a; background: #fff; }
+    .result-cell.loss { color: #1a1a1a; }
     .result-cell.absence { color: #777; font-size: 14px; background: #f7f7f7; }
     .result-cell.none { color: #aaa; font-size: 15px; }
+    .opponent-id {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      color: #555;
+      font: 9px/1 ui-monospace, monospace;
+    }
+    .summary-row > * { border-top: 2px solid #555; }
+    .summary-row + .summary-row > * { border-top: 1px solid #999; }
+    .summary-label, .summary-cell {
+      height: 64px;
+      background: #f5f5f5;
+      color: #111;
+      font-weight: 800;
+    }
+    .summary-label { font-size: 12px; white-space: nowrap; }
+    .summary-cell { font-size: clamp(15px, 1.1vw, 21px); }
     .table-caption {
       display: flex;
       justify-content: space-between;
@@ -280,15 +323,15 @@
       font-size: 11px;
     }
     .table-caption .symbols { display: flex; gap: 18px; }
-    .table-caption .win-mark { color: #111; }
-    .table-caption .loss-mark { color: #666; }
+    .table-caption .win-mark { color: #1a1a1a; }
+    .table-caption .loss-mark { color: #1a1a1a; }
     @media (max-width: 1100px) {
       .table-wrap { overflow-x: auto; }
       .results-table { min-width: 1840px; }
     }
     @media (max-height: 850px) {
       .name-head { height: 245px; }
-      .name-cell { height: 239px; font-size: 11px; }
+      .name-cell { height: 239px; font-size: 14px; }
       .round-label, .result-cell { height: 61px; }
     }
   </style>
@@ -306,7 +349,14 @@
   <main class="app">
     <header>
       <h1>茨城新聞社杯県南予選</h1>
-      <div class="meta"><b id="player-count"></b>名参加　｜　最終更新 <span id="updated-at"></span></div>
+      <div class="header-tools">
+        <button class="highlight-button" id="highlight-button" type="button" aria-pressed="false">上位8名を強調</button>
+        <div class="row-toggles" aria-label="集計行の表示切替">
+          <label class="row-toggle"><input id="show-sc" type="checkbox" checked>SC</label>
+          <label class="row-toggle"><input id="show-sb" type="checkbox" checked>SB</label>
+        </div>
+        <div class="meta"><b id="player-count"></b>名参加　｜　最終更新 <span id="updated-at"></span></div>
+      </div>
     </header>
     <section class="table-wrap" aria-label="56名の回戦別勝敗表">
       <table class="results-table" id="results-table"></table>
@@ -397,21 +447,28 @@
 
       const results = new Map();
       round.forEach(match => {
-        results.set(match.a, match.result === 'A' ? 'win' : 'loss');
-        results.set(match.b, match.result === 'B' ? 'win' : 'loss');
+        results.set(match.a, {
+          outcome: match.result === 'A' ? 'win' : 'loss',
+          opponentId: match.b
+        });
+        results.set(match.b, {
+          outcome: match.result === 'B' ? 'win' : 'loss',
+          opponentId: match.a
+        });
       });
       const absentIds = new Set(data.absences?.[roundIndex] || []);
       data.players.forEach(player => {
         const td = document.createElement('td');
+        const result = results.get(player.id);
         if (absentIds.has(player.id)) {
           td.className = 'result-cell absence';
           td.textContent = '欠';
           td.title = `${player.name}：欠席`;
-        } else if (results.get(player.id) === 'win') {
+        } else if (result?.outcome === 'win') {
           td.className = 'result-cell win';
           td.textContent = '○';
           td.title = `${player.name}：勝ち`;
-        } else if (results.get(player.id) === 'loss') {
+        } else if (result?.outcome === 'loss') {
           td.className = 'result-cell loss';
           td.textContent = '●';
           td.title = `${player.name}：負け`;
@@ -420,11 +477,124 @@
           td.textContent = '－';
           td.title = `${player.name}：対局なし`;
         }
+        if (result && !absentIds.has(player.id)) {
+          const opponentId = document.createElement('span');
+          opponentId.className = 'opponent-id';
+          opponentId.textContent = result.opponentId;
+          opponentId.title = `対戦相手ID：${result.opponentId}`;
+          td.append(opponentId);
+        }
         row.append(td);
       });
       tbody.append(row);
     });
+
+    const winCounts = new Map(data.players.map(player => [player.id, 0]));
+    const winPoints = new Map(data.players.map(player => [player.id, 50]));
+    const opponentIds = new Map(data.players.map(player => [player.id, []]));
+    const defeatedOpponentIds = new Map(data.players.map(player => [player.id, []]));
+    const absentPlayerIds = new Set((data.absences || []).flat());
+    data.rounds.forEach((round, roundIndex) => {
+      const lossPenalty = 10 - roundIndex;
+      round.forEach(match => {
+        const winnerId = match.result === 'A' ? match.a : match.b;
+        const loserId = match.result === 'A' ? match.b : match.a;
+        winCounts.set(winnerId, winCounts.get(winnerId) + 1);
+        winPoints.set(loserId, winPoints.get(loserId) - lossPenalty);
+        opponentIds.get(match.a).push(match.b);
+        opponentIds.get(match.b).push(match.a);
+        defeatedOpponentIds.get(winnerId).push(loserId);
+      });
+    });
+
+    const solkoffScores = new Map(data.players.map(player => [
+      player.id,
+      opponentIds.get(player.id).reduce((total, opponentId) => total + winCounts.get(opponentId), 0)
+    ]));
+    const sbScores = new Map(data.players.map(player => [
+      player.id,
+      defeatedOpponentIds.get(player.id).reduce(
+        (total, opponentId) => total + winCounts.get(opponentId),
+        0
+      )
+    ]));
+
+    const rankedPlayers = data.players
+      .filter(player => !absentPlayerIds.has(player.id))
+      .sort((left, right) =>
+        winCounts.get(right.id) - winCounts.get(left.id) ||
+        winPoints.get(right.id) - winPoints.get(left.id) ||
+        solkoffScores.get(right.id) - solkoffScores.get(left.id) ||
+        sbScores.get(right.id) - sbScores.get(left.id)
+      );
+    const rankings = new Map();
+    let previousScore = null;
+    let previousRank = 0;
+    rankedPlayers.forEach((player, index) => {
+      const wins = winCounts.get(player.id);
+      const score = wins === 5
+        ? 'perfect-score'
+        : [
+            wins,
+            winPoints.get(player.id),
+            solkoffScores.get(player.id),
+            sbScores.get(player.id)
+          ].join(':');
+      const rank = score === previousScore ? previousRank : index + 1;
+      rankings.set(player.id, rank);
+      previousScore = score;
+      previousRank = rank;
+    });
+
+    const appendSummaryRow = (labelText, values, suffix = '') => {
+      const row = document.createElement('tr');
+      row.className = 'summary-row';
+      const label = document.createElement('th');
+      label.className = 'summary-label';
+      label.scope = 'row';
+      label.textContent = labelText;
+      row.append(label);
+      data.players.forEach(player => {
+        const td = document.createElement('td');
+        td.className = 'summary-cell';
+        td.textContent = absentPlayerIds.has(player.id)
+          ? 'ー'
+          : `${values.get(player.id)}${suffix}`;
+        row.append(td);
+      });
+      tbody.append(row);
+      return row;
+    };
+
+    appendSummaryRow('勝ち数', winCounts);
+    appendSummaryRow('勝ち点', winPoints);
+    const scRow = appendSummaryRow('SC', solkoffScores);
+    const sbRow = appendSummaryRow('SB', sbScores);
+    appendSummaryRow('順位', rankings);
     tableEl.append(thead, tbody);
+
+    const topEightIds = new Set(rankedPlayers.slice(0, 8).map(player => player.id));
+    data.players.forEach((player, playerIndex) => {
+      if (!topEightIds.has(player.id)) return;
+      tableEl.querySelectorAll(`tr > *:nth-child(${playerIndex + 2})`)
+        .forEach(cell => cell.classList.add('top-eight'));
+    });
+
+    const highlightButton = document.getElementById('highlight-button');
+    highlightButton.addEventListener('click', () => {
+      const enabled = document.body.classList.toggle('highlight-top-eight');
+      highlightButton.setAttribute('aria-pressed', String(enabled));
+      highlightButton.textContent = enabled ? '強調を解除' : '上位8名を強調';
+    });
+
+    const bindRowToggle = (checkboxId, row) => {
+      const checkbox = document.getElementById(checkboxId);
+      checkbox.addEventListener('change', () => {
+        row.hidden = !checkbox.checked;
+      });
+    };
+    bindRowToggle('show-sc', scRow);
+    bindRowToggle('show-sb', sbRow);
   </script>
 </body>
 </html>
