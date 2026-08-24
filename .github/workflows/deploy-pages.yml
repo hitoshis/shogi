@@ -1,0 +1,72 @@
+name: Deploy tournament to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - tournament.html
+      - shogi-tournament-backup-20260824.json
+      - .github/workflows/deploy-pages.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v6
+
+      - name: Validate and prepare site
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          node <<'NODE'
+          const fs = require('fs');
+          const html = fs.readFileSync('tournament.html', 'utf8');
+          const match = html.match(
+            /<script id="tournament-data" type="application\/json">\s*([\s\S]*?)\s*<\/script>/
+          );
+
+          if (!match) {
+            throw new Error('HTML内に大会JSONデータが見つかりません。');
+          }
+
+          const data = JSON.parse(match[1]);
+          if (data.players.length !== 56 || data.rounds.length !== 5) {
+            throw new Error('想定した大会データ（56名・5回戦）ではありません。');
+          }
+          NODE
+
+          mkdir -p _site
+          cp tournament.html _site/index.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
