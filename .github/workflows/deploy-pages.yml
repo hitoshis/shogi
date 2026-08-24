@@ -42,8 +42,14 @@ jobs:
           const data = JSON.parse(
             fs.readFileSync('shogi-tournament-backup-20260824.json', 'utf8')
           );
-          if (data.players.length !== 56 || data.rounds.length !== 5) {
-            throw new Error('想定した大会データ（56名・5回戦）ではありません。');
+          if (!Array.isArray(data.players) || data.players.length === 0) {
+            throw new Error('選手データがありません。');
+          }
+          if (!Array.isArray(data.rounds) || data.rounds.length < 1 || data.rounds.length > 5) {
+            throw new Error('回戦データは1～5回戦である必要があります。');
+          }
+          if (data.rounds.some(round => !Array.isArray(round))) {
+            throw new Error('回戦データの形式が正しくありません。');
           }
           NODE
 

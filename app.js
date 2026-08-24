@@ -3,6 +3,7 @@
 const PASSWORD_HASH = '379fb1eb999bfb776c12bc25e7d4c248ab718490f43c760e51c641ab083b0779';
 const AUTH_KEY = 'shogi-tournament-authenticated';
 const DATA_URL = 'shogi-tournament-backup-20260824.json';
+const MAX_ROUNDS = 5;
 const loginForm = document.getElementById('login-form');
 const passwordInput = document.getElementById('password');
 const loginError = document.getElementById('login-error');
@@ -61,7 +62,8 @@ const calculateStandings = () => {
   const winPoints = createPlayerMap(50);
   const opponentIds = createPlayerMap(() => []);
   const defeatedOpponentIds = createPlayerMap(() => []);
-  const absentPlayerIds = new Set((data.absences || []).flat());
+  const completedRoundAbsences = (data.absences || []).slice(0, data.rounds.length);
+  const absentPlayerIds = new Set(completedRoundAbsences.flat());
 
   data.rounds.forEach((round, roundIndex) => {
     round.forEach(match => {
@@ -90,7 +92,7 @@ const calculateStandings = () => {
   let previousRank = 0;
   rankedPlayers.forEach((player, index) => {
     const wins = winCounts.get(player.id);
-    const score = wins === 5
+    const score = wins === MAX_ROUNDS
       ? 'perfect-score'
       : [wins, winPoints.get(player.id), solkoffScores.get(player.id), sbScores.get(player.id)].join(':');
     const rank = score === previousScore ? previousRank : index + 1;
@@ -234,6 +236,10 @@ const renderTournament = () => {
 
 const updateMetadata = () => {
   document.getElementById('player-count').textContent = data.players.length;
+  document.getElementById('caption-player-count').textContent = data.players.length;
+  document.getElementById('round-progress').textContent = data.rounds.length === MAX_ROUNDS
+    ? `全${MAX_ROUNDS}回戦終了`
+    : `第${data.rounds.length}回戦終了時点`;
   document.getElementById('updated-at').textContent = new Intl.DateTimeFormat('ja-JP', {
     timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit'
